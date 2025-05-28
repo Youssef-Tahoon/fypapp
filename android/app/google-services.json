@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "129690399865",
+    "project_id": "zakatyappfyp",
+    "storage_bucket": "zakatyappfyp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:129690399865:android:c0da8293ad77f9a42890a8",
+        "android_client_info": {
+          "package_name": "com.example.fyp_zakaty_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBzpXVIEtJcegUHuRtwsBhJH5vM7Wu6thc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
