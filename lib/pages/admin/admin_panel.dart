@@ -2,8 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/admin_provider.dart';
 import 'case_approval_page.dart';
+import 'manage_users_page.dart';
+import 'manage_charities_page.dart';
+import 'admin_home_page.dart';
 
-class AdminPanel extends StatelessWidget {
+class AdminPanel extends StatefulWidget {
+  @override
+  _AdminPanelState createState() => _AdminPanelState();
+}
+
+class _AdminPanelState extends State<AdminPanel> {
+  int _currentIndex = 0;
+  
+  final List<Widget> _pages = [
+    AdminHomePage(),
+    CaseApprovalPage(),
+    ManageUsersPage(),
+    ManageCharitiesPage(),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final adminProvider = context.watch<AdminProvider>();
@@ -27,19 +44,65 @@ class AdminPanel extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Admin Panel'),
+        title: Text(_getTitle()),
         backgroundColor: Colors.red[700],
         actions: [
           IconButton(
             icon: Icon(Icons.logout),
-            onPressed: () {
-              adminProvider.signOut();
-              Navigator.pushReplacementNamed(context, '/admin-login');
+            onPressed: () async {
+              await adminProvider.signOut();
+              if (mounted) {
+                Navigator.pushReplacementNamed(context, '/admin-login');
+              }
             },
           ),
         ],
       ),
-      body: CaseApprovalPage(),
+      body: _pages[_currentIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: Colors.red[700],
+        unselectedItemColor: Colors.grey,
+        items: [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard),
+            label: 'Dashboard',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.approval),
+            label: 'Cases',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.people),
+            label: 'Users',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.volunteer_activism),
+            label: 'Charities',
+          ),
+        ],
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+      ),
     );
+  }
+
+  String _getTitle() {
+    switch (_currentIndex) {
+      case 0:
+        return 'Admin Dashboard';
+      case 1:
+        return 'Case Approval';
+      case 2:
+        return 'Manage Users';
+      case 3:
+        return 'Manage Charities';
+      default:
+        return 'Admin Panel';
+    }
   }
 } 

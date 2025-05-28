@@ -4,6 +4,20 @@ import 'package:provider/provider.dart';
 import '../../providers/admin_provider.dart';
 
 class CaseApprovalPage extends StatelessWidget {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  Future<void> _updateCaseStatus(String caseId, String status) async {
+    try {
+      await _firestore.collection('cases').doc(caseId).update({
+        'status': status,
+        '${status}At': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('Error updating case status: $e');
+      throw e;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -21,7 +35,7 @@ class CaseApprovalPage extends StatelessWidget {
         ],
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
+        stream: _firestore
             .collection('cases')
             .where('status', isEqualTo: 'pending')
             .snapshots(),
@@ -34,51 +48,139 @@ class CaseApprovalPage extends StatelessWidget {
             return Center(child: CircularProgressIndicator());
           }
 
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return Center(child: Text('No pending cases to review'));
+          final cases = snapshot.data?.docs ?? [];
+
+          if (cases.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.check_circle_outline,
+                    size: 64,
+                    color: Colors.green,
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'No pending cases to review',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ],
+              ),
+            );
           }
 
           return ListView.builder(
-            itemCount: snapshot.data!.docs.length,
+            itemCount: cases.length,
+            padding: EdgeInsets.all(16),
             itemBuilder: (context, index) {
-              final caseDoc = snapshot.data!.docs[index];
+              final caseDoc = cases[index];
               final caseData = caseDoc.data() as Map<String, dynamic>;
 
               return Card(
-                margin: EdgeInsets.all(8.0),
+                margin: EdgeInsets.only(bottom: 16),
                 child: Padding(
-                  padding: EdgeInsets.all(16.0),
+                  padding: EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Case ID: ${caseDoc.id}',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[600],
+                        ),
                       ),
                       SizedBox(height: 8),
-                      Text('Title: ${caseData['title'] ?? 'N/A'}'),
-                      Text('Description: ${caseData['description'] ?? 'N/A'}'),
-                      Text('Amount Needed: \$${caseData['amountNeeded'] ?? 0}'),
-                      Text('Submitted by: ${caseData['submittedBy'] ?? 'Unknown'}'),
+                      Text(
+                        caseData['title']?.toString() ?? 'Untitled Case',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        caseData['description']?.toString() ?? 'No description provided',
+                        style: TextStyle(fontSize: 16),
+                      ),
                       SizedBox(height: 16),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
+                          Icon(Icons.attach_money, color: Colors.green),
+                          Text(
+                            'Amount Needed: \$${caseData['amountNeeded']?.toString() ?? '0'}',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (caseData['submittedBy'] != null) ...[
+                        SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(Icons.person, color: Colors.blue),
+                            SizedBox(width: 8),
+                            Text(
+                              'Submitted by: ${caseData['submittedBy']}',
+                              style: TextStyle(color: Colors.grey[700]),
+                            ),
+                          ],
+                        ),
+                      ],
+                      SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton.icon(
+                            onPressed: () async {
+                              try {
+                                await _updateCaseStatus(caseDoc.id, 'rejected');
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Case rejected'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error: $e'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            },
+                            icon: Icon(Icons.close, color: Colors.red),
+                            label: Text(
+                              'Reject',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                          ),
+                          SizedBox(width: 16),
                           ElevatedButton.icon(
+                            onPressed: () async {
+                              try {
+                                await _updateCaseStatus(caseDoc.id, 'approved');
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Case approved'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error: $e'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            },
                             icon: Icon(Icons.check),
                             label: Text('Approve'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                             ),
-                            onPressed: () => _approveCase(caseDoc.id),
-                          ),
-                          ElevatedButton.icon(
-                            icon: Icon(Icons.close),
-                            label: Text('Reject'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                            ),
-                            onPressed: () => _rejectCase(caseDoc.id),
                           ),
                         ],
                       ),
@@ -91,27 +193,5 @@ class CaseApprovalPage extends StatelessWidget {
         },
       ),
     );
-  }
-
-  Future<void> _approveCase(String caseId) async {
-    try {
-      await FirebaseFirestore.instance.collection('cases').doc(caseId).update({
-        'status': 'approved',
-        'approvedAt': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      print('Error approving case: $e');
-    }
-  }
-
-  Future<void> _rejectCase(String caseId) async {
-    try {
-      await FirebaseFirestore.instance.collection('cases').doc(caseId).update({
-        'status': 'rejected',
-        'rejectedAt': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      print('Error rejecting case: $e');
-    }
   }
 } 

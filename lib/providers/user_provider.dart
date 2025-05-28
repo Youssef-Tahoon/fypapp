@@ -117,14 +117,22 @@ class UserProvider extends ChangeNotifier {
         password: password,
       );
 
-      // Create admin document in Firestore
-      await _firestore.collection('users').doc(userCredential.user!.uid).set({
-        'email': email,
-        'role': 'admin',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      // Create admin document in both collections for redundancy
+      await Future.wait([
+        // Add to users collection with admin role
+        _firestore.collection('users').doc(userCredential.user!.uid).set({
+          'email': email,
+          'role': 'admin',
+        }),
+        
+        // Add to admins collection
+        _firestore.collection('admins').doc(email).set({
+          'uid': userCredential.user!.uid,
+          'email': email,
+        })
+      ]);
 
-      print('Admin user created successfully');
+      print('Admin user created successfully in both collections');
       await _fetchUserRole();
     } catch (e) {
       print('Error creating admin user: $e');
@@ -132,6 +140,25 @@ class UserProvider extends ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<bool> verifyAdminStatus(String email) async {
+    try {
+      // Check admins collection
+      final adminDoc = await _firestore.collection('admins').doc(email).get();
+      if (adminDoc.exists) return true;
+
+      // Check users collection if user is authenticated
+      if (_user != null) {
+        final userDoc = await _firestore.collection('users').doc(_user!.uid).get();
+        if (userDoc.exists && userDoc.data()?['role'] == 'admin') return true;
+      }
+
+      return false;
+    } catch (e) {
+      print('Error verifying admin status: $e');
+      return false;
     }
   }
 
