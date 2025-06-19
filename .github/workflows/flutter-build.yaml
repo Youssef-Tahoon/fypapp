@@ -1,0 +1,44 @@
+name: Build Flutter APK
+
+on:
+  push:
+    branches:
+      - main  # Or whatever your main branch is
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'  # Set to your version
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Upload APK to GitHub Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Zip APK
+        run: |
+          mkdir output
+          cp build/app/outputs/flutter-apk/app-release.apk output/
+          cd output
+          zip flutter-apk.zip app-release.apk
+
+      - name: Upload Zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-apk-zip
+          path: output/flutter-apk.zip
