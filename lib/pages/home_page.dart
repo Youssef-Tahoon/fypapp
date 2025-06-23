@@ -1,7 +1,6 @@
 // lib/pages/home_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../providers/case_provider.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:shimmer/shimmer.dart';
@@ -15,27 +14,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   late TabController _tabController;
   bool _isLoading = false;
 
-  final List<Map<String, String>> _zakatFacts = [
-    {
-      'title': 'Understanding Zakat',
-      'description': 'Zakat is one of the Five Pillars of Islam, requiring Muslims to give 2.5% of their wealth to those in need.',
-      'videoUrl': 'https://www.youtube.com/watch?v=wj8SxkzHwVM',
-      'imageUrl': 'https://img.youtube.com/vi/wj8SxkzHwVM/0.jpg',
-    },
-    {
-      'title': 'Who Receives Zakat?',
-      'description': 'There are eight categories of people eligible to receive Zakat, including the poor, needy, and wayfarers.',
-      'videoUrl': 'https://www.youtube.com/watch?v=E0KkYZXn4I0',
-      'imageUrl': 'https://img.youtube.com/vi/E0KkYZXn4I0/0.jpg',
-    },
-    {
-      'title': 'Calculating Zakat',
-      'description': 'Learn how to calculate your Zakat accurately based on your assets and wealth.',
-      'videoUrl': 'https://www.youtube.com/watch?v=7Q3iAD8f5_E',
-      'imageUrl': 'https://img.youtube.com/vi/7Q3iAD8f5_E/0.jpg',
-    },
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -47,13 +25,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     setState(() => _isLoading = true);
     await context.read<CaseProvider>().fetchApprovedCases();
     setState(() => _isLoading = false);
-  }
-
-  void _launchURL(String url) async {
-    final uri = Uri.parse(url);
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      throw 'Could not launch $url';
-    }
   }
 
   Widget _buildQuickActions() {
@@ -237,62 +208,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
-  Widget _buildZakatFacts() {
-    return Container(
-      height: 200,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: _zakatFacts.length,
-        itemBuilder: (context, index) {
-          final fact = _zakatFacts[index];
-          return Container(
-            width: 280,
-            margin: EdgeInsets.only(
-              left: index == 0 ? 16 : 8,
-              right: index == _zakatFacts.length - 1 ? 16 : 8,
-            ),
-            child: Card(
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: () => _launchURL(fact['videoUrl']!),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Image.network(
-                      fact['imageUrl']!,
-                      height: 120,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
-                    Padding(
-                      padding: EdgeInsets.all(8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            fact['title']!,
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            fact['description']!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -309,16 +224,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             ),
             children: [
               _buildQuickActions(),
-              SizedBox(height: 24),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  "Learn About Zakat",
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              ),
-              SizedBox(height: 16),
-              _buildZakatFacts(),
               SizedBox(height: 24),
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16),

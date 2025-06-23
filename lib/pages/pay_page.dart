@@ -5,6 +5,10 @@ import 'package:fyp_zakaty_app/main.dart';
 import 'package:flutter_stripe/flutter_stripe.dart' as stripe;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:provider/provider.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../providers/user_provider.dart';
 
 class PayZakatPage extends StatefulWidget {
   const PayZakatPage({super.key});
@@ -25,9 +29,14 @@ class _PayZakatPageState extends State<PayZakatPage> {
     super.initState();
     // If amount is passed from calculator
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      final args =
+          ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       if (args != null && args.containsKey('amount')) {
         amountController.text = args['amount'].toString();
+      }
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      if (userProvider.user?.email != null) {
+        emailController.text = userProvider.user!.email!;
       }
     });
   }
@@ -39,11 +48,12 @@ class _PayZakatPageState extends State<PayZakatPage> {
     try {
       // 1. Call your backend to create a PaymentIntent
       final response = await http.post(
-        Uri.parse('https://your-backend.com/create-payment-intent'), // <-- your backend endpoint
+        Uri.parse(
+            'https://buy.stripe.com/test_00w7sLbgm1v98JL1RxaEE01'), // <-- your backend endpoint
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
-          'amount': (double.parse(amountController.text) * 100).toInt(), // in cents
-          'currency': 'myr', // or 'usd', etc.
+          'amount': (double.parse(amountController.text) * 100).toInt(),
+          'currency': 'myr',
           'email': emailController.text,
         }),
       );
@@ -75,6 +85,15 @@ class _PayZakatPageState extends State<PayZakatPage> {
     }
   }
 
+  Future<void> _launchStripeCheckout() async {
+    const url = 'https://buy.stripe.com/test_00w7sLbgm1v98JL1RxaEE01';
+    if (await canLaunch(url)) {
+      await launch(url);
+    } else {
+      throw 'Could not launch $url';
+    }
+  }
+
   bool _validateFields() {
     if (amountController.text.isEmpty ||
         nameController.text.isEmpty ||
@@ -86,7 +105,7 @@ class _PayZakatPageState extends State<PayZakatPage> {
       );
       return false;
     }
-    
+
     // Validate email format
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
     if (!emailRegex.hasMatch(emailController.text)) {
@@ -99,7 +118,8 @@ class _PayZakatPageState extends State<PayZakatPage> {
 
     // Validate phone number (basic validation for numbers only)
     final phoneRegex = RegExp(r'^\d{10,}$');
-    if (!phoneRegex.hasMatch(phoneController.text.replaceAll(RegExp(r'[^0-9]'), ''))) {
+    if (!phoneRegex
+        .hasMatch(phoneController.text.replaceAll(RegExp(r'[^0-9]'), ''))) {
       Fluttertoast.showToast(
         msg: "Please enter a valid phone number",
         toastLength: Toast.LENGTH_LONG,
@@ -158,7 +178,8 @@ class _PayZakatPageState extends State<PayZakatPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   ElevatedButton(
-                    onPressed: () => Navigator.pushNamed(context, '/zakat_calculator'),
+                    onPressed: () =>
+                        Navigator.pushNamed(context, '/zakat_calculator'),
                     child: const Text("Calculate My Zakat"),
                   ),
                   const SizedBox(height: 20),
@@ -167,6 +188,12 @@ class _PayZakatPageState extends State<PayZakatPage> {
                     controller: amountController,
                     icon: Icons.attach_money,
                     keyboardType: TextInputType.number,
+                    maxLength: 10,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'^\d+\.?\d{0,2}'),
+                      ),
+                    ],
                   ),
                   _buildTextField(
                     label: 'Full Name',
@@ -178,18 +205,25 @@ class _PayZakatPageState extends State<PayZakatPage> {
                     controller: emailController,
                     icon: Icons.email,
                     keyboardType: TextInputType.emailAddress,
+                    readOnly: true,
                   ),
                   _buildTextField(
                     label: 'Phone Number',
                     controller: phoneController,
                     icon: Icons.phone,
                     keyboardType: TextInputType.phone,
+                    maxLength: 12,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'^\d{0,12}'),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: isProcessing ? null : processPayment,
+                      onPressed: isProcessing ? null : _launchStripeCheckout,
                       icon: isProcessing
                           ? Container(
                               width: 24,
@@ -226,13 +260,15 @@ class _PayZakatPageState extends State<PayZakatPage> {
                 ),
                 _buildCaseCard(
                   title: "Education Fund",
-                  description: "Support orphans in completing their school year.",
+                  description:
+                      "Support orphans in completing their school year.",
                   raised: 1200,
                   goal: 3000,
                 ),
                 _buildCaseCard(
                   title: "Debt Relief",
-                  description: "Assist a struggling family with urgent debt payment.",
+                  description:
+                      "Assist a struggling family with urgent debt payment.",
                   raised: 800,
                   goal: 2000,
                 ),
@@ -257,8 +293,9 @@ class _PayZakatPageState extends State<PayZakatPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: const TextStyle(
-                fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(title,
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text(description),
             const SizedBox(height: 12),
@@ -268,8 +305,8 @@ class _PayZakatPageState extends State<PayZakatPage> {
               backgroundColor: Colors.grey[200],
             ),
             const SizedBox(height: 8),
-            Text("Raised: RM ${raised.toStringAsFixed(2)} / RM ${goal
-                .toStringAsFixed(2)}"),
+            Text(
+                "Raised: RM ${raised.toStringAsFixed(2)} / RM ${goal.toStringAsFixed(2)}"),
             const SizedBox(height: 12),
             Align(
               alignment: Alignment.centerRight,
@@ -291,6 +328,8 @@ class _PayZakatPageState extends State<PayZakatPage> {
     String? hint,
     TextInputType? keyboardType,
     int? maxLength,
+    bool readOnly = false,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -298,6 +337,8 @@ class _PayZakatPageState extends State<PayZakatPage> {
         controller: controller,
         keyboardType: keyboardType ?? TextInputType.text,
         maxLength: maxLength,
+        readOnly: readOnly,
+        inputFormatters: inputFormatters,
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,

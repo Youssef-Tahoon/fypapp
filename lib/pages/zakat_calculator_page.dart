@@ -33,8 +33,8 @@ class _ZakatCalculatorPageState extends State<ZakatCalculatorPage> {
   bool silverEligible = true;
   bool salaryEligible = true;
 
-  final double goldPricePerGram = 456.0;
-  final double silverPricePerGram = 4.45;
+  final double goldPricePerGram = 455.8;
+  final double silverPricePerGram = 4.94;
   final double nisabGoldGrams = 85.0;
   final double nisabSilverGrams = 595.0;
   final double minMonthlySalary = 2400.0;

@@ -17,12 +17,15 @@ import 'providers/admin_provider.dart';
 import 'auth/admin_login_page.dart';
 import 'pages/admin/admin_panel.dart';
 import 'firebase_options.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  Stripe.publishableKey =
+      'pk_test_51RdC7uGaSpItgJZmgzWOIoxbrK1ulSAqzqKTYy6FX94v8nDmHIrMTkpjieNaXrocAEi6Pvp6u2ggebbzBs0fBmuG00ZepxtW2I';
   runApp(
     MultiProvider(
       providers: [
@@ -89,7 +92,9 @@ class _MainNavigationState extends State<MainNavigation> {
         actions: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Chip(label: Text('1442 AH', style: TextStyle(color: Colors.white)), backgroundColor: Colors.green.shade800),
+            child: Chip(
+                label: Text('1442 AH', style: TextStyle(color: Colors.white)),
+                backgroundColor: Colors.green.shade800),
           ),
           CircleAvatar(
             backgroundColor: Colors.green.shade500,
@@ -111,7 +116,8 @@ class _MainNavigationState extends State<MainNavigation> {
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Cases'),
           BottomNavigationBarItem(icon: Icon(Icons.payment), label: 'Pay'),
-          BottomNavigationBarItem(icon: Icon(Icons.calculate), label: 'Calculate'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.calculate), label: 'Calculate'),
           BottomNavigationBarItem(icon: Icon(Icons.menu_book), label: 'Learn'),
         ],
       ),
