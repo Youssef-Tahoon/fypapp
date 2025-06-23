@@ -1,172 +1,227 @@
 import 'package:flutter/material.dart';
 import '../colors/colors.dart';
-// import your user-model / api client here
-// import '../models/user.dart';
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 
 class SettingsPage extends StatefulWidget {
+  const SettingsPage({Key? key}) : super(key: key);
+
   @override
-  _SettingsPageState createState() => _SettingsPageState();
+  State<SettingsPage> createState() => _SettingsPageState();
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  // dummy user data — replace with your API call
-  String _userName = 'Loading…';
-  String _avatarUrl =
-      'https://via.placeholder.com/150'; // load from your API
-  bool _loadingUser = true;
+  String? _imageUrl;
+  final User? _currentUser = FirebaseAuth.instance.currentUser;
 
-  // notification toggles
-  bool _notifReceived = true;
-  bool _notifNewsletter = false;
-  bool _notifOffer = true;
-  bool _notifUpdates = false;
+  Future<void> _pickImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
 
-  @override
-  void initState() {
-    super.initState();
-    _fetchUserProfile();
-  }
+    if (image != null) {
+      setState(() => _imageUrl = image.path);
 
-  Future<void> _fetchUserProfile() async {
-    // TODO: call your backend / Firebase to get current user
-    await Future.delayed(Duration(seconds: 1)); // simulate network
-    setState(() {
-      _userName = 'John Doe';
-      _avatarUrl =
-      'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg';
-      _loadingUser = false;
-    });
+      // Upload to Firebase Storage
+      try {
+        final ref = FirebaseStorage.instance
+            .ref()
+            .child('user_profiles')
+            .child('${_currentUser!.uid}.jpg');
+
+        await ref.putFile(File(image.path));
+        final downloadUrl = await ref.getDownloadURL();
+
+        // Update user profile
+        await _currentUser!.updatePhotoURL(downloadUrl);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile picture updated successfully')),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating profile picture: $e')),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final primary = AppColor.kPrimary;
-    final accent = AppColor.kLightAccentColor;
-
     return Scaffold(
       appBar: AppBar(
-        title: Text('Settings'),
-        backgroundColor: primary,
+        title: const Text('Settings'),
+        backgroundColor: Colors.green.shade700,
+        elevation: 0,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // ── Profile card ─────────────────────────
-            _loadingUser
-                ? Center(child: CircularProgressIndicator())
-                : Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              color: primary,
-              child: ListTile(
-                leading: CircleAvatar(
-                  radius: 28,
-                  backgroundImage: NetworkImage(_avatarUrl),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.green.shade700,
+              Colors.green.shade50,
+            ],
+          ),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Card(
+                elevation: 8,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
                 ),
-                title: Text(
-                  _userName,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 50,
+                            backgroundColor: Colors.green.shade100,
+                            backgroundImage: _imageUrl != null
+                                ? FileImage(File(_imageUrl!))
+                                : _currentUser?.photoURL != null
+                                ? NetworkImage(_currentUser!.photoURL!)
+                            as ImageProvider
+                                : null,
+                            child: _imageUrl == null && _currentUser?.photoURL == null
+                                ? Icon(Icons.person,
+                                size: 50, color: Colors.green.shade700)
+                                : null,
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: CircleAvatar(
+                              backgroundColor: Colors.green.shade700,
+                              radius: 18,
+                              child: IconButton(
+                                icon: const Icon(Icons.camera_alt,
+                                    size: 18, color: Colors.white),
+                                onPressed: _pickImage,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        _currentUser?.displayName ?? 'User',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        _currentUser?.email ?? '',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                trailing: IconButton(
-                  icon: Icon(Icons.edit, color: Colors.white),
-                  onPressed: () {
-                    // TODO: navigate to edit-profile screen
-                  },
+              ),
+              const SizedBox(height: 16),
+              Card(
+                elevation: 8,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Column(
+                  children: [
+                    _buildSettingsTile(
+                      icon: Icons.notifications,
+                      title: 'Notifications',
+                      trailing: Switch(
+                        value: true,
+                        onChanged: (value) {},
+                        activeColor: Colors.green.shade700,
+                      ),
+                    ),
+                    _buildSettingsTile(
+                      icon: Icons.lock,
+                      title: 'Change Password',
+                      onTap: () => Navigator.pushNamed(context, '/forgot-password'),
+                    ),
+                    _buildSettingsTile(
+                      icon: Icons.language,
+                      title: 'Language',
+                      subtitle: 'English',
+                    ),
+                    _buildSettingsTile(
+                      icon: Icons.dark_mode,
+                      title: 'Dark Mode',
+                      trailing: Switch(
+                        value: false,
+                        onChanged: (value) {},
+                        activeColor: Colors.green.shade700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
-
-            // ── Account actions ───────────────────────
-            Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: Icon(Icons.lock, color: accent),
-                    title: Text('Change Password'),
-                    trailing: Icon(Icons.chevron_right),
-                    onTap: () {
-                      // TODO: navigator to change-password
-                    },
-                  ),
-                  Divider(height: 1),
-                  ListTile(
-                    leading: Icon(Icons.translate, color: accent),
-                    title: Text('Change Language'),
-                    trailing: Icon(Icons.chevron_right),
-                    onTap: () {},
-                  ),
-                  Divider(height: 1),
-                  ListTile(
-                    leading: Icon(Icons.location_on, color: accent),
-                    title: Text('Change Location'),
-                    trailing: Icon(Icons.chevron_right),
-                    onTap: () {},
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 32),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Notification Settings',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: primary,
+              const SizedBox(height: 16),
+              Card(
+                elevation: 8,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Column(
+                  children: [
+                    _buildSettingsTile(
+                      icon: Icons.help,
+                      title: 'Help & Support',
+                    ),
+                    _buildSettingsTile(
+                      icon: Icons.privacy_tip,
+                      title: 'Privacy Policy',
+                    ),
+                    _buildSettingsTile(
+                      icon: Icons.logout,
+                      title: 'Logout',
+                      textColor: Colors.red,
+                      onTap: () async {
+                        await FirebaseAuth.instance.signOut();
+                        Navigator.pushReplacementNamed(context, '/login');
+                      },
+                    ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-
-            SwitchListTile(
-              title: Text('Received notification'),
-              value: _notifReceived,
-              onChanged: (v) => setState(() => _notifReceived = v),
-              activeColor: accent,
-            ),
-            SwitchListTile(
-              title: Text('Received newsletter'),
-              value: _notifNewsletter,
-              onChanged: (v) => setState(() => _notifNewsletter = v),
-              activeColor: accent,
-            ),
-            SwitchListTile(
-              title: Text('Received offer notification'),
-              value: _notifOffer,
-              onChanged: (v) => setState(() => _notifOffer = v),
-              activeColor: accent,
-            ),
-            SwitchListTile(
-              title: Text('Received app updates'),
-              value: _notifUpdates,
-              onChanged: (v) => setState(() => _notifUpdates = v),
-              activeColor: accent,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
+    );
+  }
 
-      // ── Logout FAB ─────────────────────────────
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: primary,
-        onPressed: () {
-          // TODO: your logout logic here
-          Navigator.pushReplacementNamed(context, '/login');
-        },
-        child: Icon(Icons.power_settings_new, color: Colors.white),
+  Widget _buildSettingsTile({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    Widget? trailing,
+    Color? textColor,
+    VoidCallback? onTap,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.green.shade700),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: textColor,
+          fontWeight: FontWeight.w500,
+        ),
       ),
+      subtitle: subtitle != null ? Text(subtitle) : null,
+      trailing: trailing ?? const Icon(Icons.arrow_forward_ios, size: 16),
+      onTap: onTap,
     );
   }
 }

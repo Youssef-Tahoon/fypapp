@@ -28,7 +28,7 @@ class AdminHomePage extends StatelessWidget {
           builder: (context, usersSnapshot) {
             if (casesSnapshot.hasError || usersSnapshot.hasError) {
               return Center(
-                child: Text('Error loading statistics'),
+                child: Text('Error loading statistics. ${casesSnapshot.error ?? usersSnapshot.error}'),
               );
             }
 
@@ -40,12 +40,23 @@ class AdminHomePage extends StatelessWidget {
             }
 
             // Safely calculate statistics
-            int totalCases = casesSnapshot.data?.docs.length ?? 0;
-            int pendingCases = casesSnapshot.data?.docs.where((doc) {
-              final data = doc.data() as Map<String, dynamic>?;
-              return data?['status'] == 'pending';
-            }).length ?? 0;
-            int totalUsers = usersSnapshot.data?.docs.length ?? 0;
+            int totalCases = 0;
+            if (casesSnapshot.hasData && casesSnapshot.data != null) {
+              totalCases = casesSnapshot.data!.docs.length;
+            }
+
+            int pendingCases = 0;
+            if (casesSnapshot.hasData && casesSnapshot.data != null) {
+              pendingCases = casesSnapshot.data!.docs.where((doc) {
+                final data = doc.data() as Map<String, dynamic>?;
+                return data != null && data['status'] == 'pending';
+              }).length;
+            }
+
+            int totalUsers = 0;
+            if (usersSnapshot.hasData && usersSnapshot.data != null) {
+              totalUsers = usersSnapshot.data!.docs.length;
+            }
 
             // Get active charities count
             return StreamBuilder<QuerySnapshot>(
@@ -53,7 +64,21 @@ class AdminHomePage extends StatelessWidget {
                   .where('isActive', isEqualTo: true)
                   .snapshots(),
               builder: (context, charitiesSnapshot) {
-                int activeCharities = charitiesSnapshot.data?.docs.length ?? 0;
+                if (charitiesSnapshot.hasError) {
+                  return Center(
+                    child: Text('Error loading charity statistics. ${charitiesSnapshot.error}'),
+                  );
+                }
+                if (charitiesSnapshot.connectionState == ConnectionState.waiting) {
+                  return Center( // Still show other stats if charities are loading
+                    child: Text('Loading Charity Stats...'), // Or a smaller indicator
+                  );
+                }
+
+                int activeCharities = 0;
+                if (charitiesSnapshot.hasData && charitiesSnapshot.data != null) {
+                  activeCharities = charitiesSnapshot.data!.docs.length;
+                }
 
                 return GridView.count(
                   crossAxisCount: 2,
@@ -147,8 +172,9 @@ class AdminHomePage extends StatelessWidget {
               'Add Charity',
               Icons.add_circle,
               Colors.green,
-              () {
+                  () {
                 // TODO: Implement add charity action
+                print("Add Charity Tapped");
               },
             ),
             _buildActionButton(
@@ -156,8 +182,9 @@ class AdminHomePage extends StatelessWidget {
               'Review Cases',
               Icons.approval,
               Colors.orange,
-              () {
+                  () {
                 // Navigate to case approval page
+                print("Review Cases Tapped");
               },
             ),
             _buildActionButton(
@@ -165,8 +192,9 @@ class AdminHomePage extends StatelessWidget {
               'Manage Users',
               Icons.people,
               Colors.blue,
-              () {
+                  () {
                 // Navigate to manage users page
+                print("Manage Users Tapped");
               },
             ),
           ],
@@ -197,16 +225,28 @@ class AdminHomePage extends StatelessWidget {
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Center(child: Text('Error loading activities'));
+          return Center(child: Text('Error loading activities: ${snapshot.error}'));
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(child: CircularProgressIndicator());
         }
 
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return Center(child: Text('No recent activities'));
+        if (!snapshot.hasData || snapshot.data == null || snapshot.data!.docs.isEmpty) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Recent Activities',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              SizedBox(height: 16),
+              Center(child: Text('No recent activities')),
+            ],
+          );
         }
+
+        final docs = snapshot.data!.docs; // Safe to use ! here due to the check above
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -219,18 +259,37 @@ class AdminHomePage extends StatelessWidget {
             ListView.builder(
               shrinkWrap: true,
               physics: NeverScrollableScrollPhysics(),
-              itemCount: snapshot.data!.docs.length,
+              itemCount: docs.length,
               itemBuilder: (context, index) {
-                final doc = snapshot.data!.docs[index];
-                final data = doc.data() as Map<String, dynamic>;
+                final doc = docs[index];
+                final data = doc.data() as Map<String, dynamic>?;
+
+                if (data == null) {
+                  // This case should ideally not happen if docs exist, but good for safety
+                  return Card(
+                    margin: EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      title: Text('Error: Could not load activity data.'),
+                    ),
+                  );
+                }
+
+                // Safely access fields with defaults
+                final String status = data['status'] as String? ?? 'Unknown';
+                final String title = data['title']?.toString() ?? 'Untitled Case';
+                final String amountNeeded = data['amountNeeded']?.toString() ?? '0';
+                // Consider how you want to display submittedAt if it's a Timestamp
+                // For now, let's assume you'll handle its display or it's not directly shown in subtitle
+                // final Timestamp? submittedAt = data['submittedAt'] as Timestamp?;
+
                 return Card(
                   margin: EdgeInsets.only(bottom: 8),
                   child: ListTile(
-                    leading: Icon(_getActivityIcon(data['status'] as String?)),
-                    title: Text(data['title']?.toString() ?? 'Untitled Case'),
-                    subtitle: Text('Status: ${data['status']?.toString() ?? 'Unknown'}'),
+                    leading: Icon(_getActivityIcon(status)),
+                    title: Text(title),
+                    subtitle: Text('Status: $status'),
                     trailing: Text(
-                      '\$${data['amountNeeded']?.toString() ?? '0'}',
+                      '\$$amountNeeded',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: Colors.green,
@@ -247,7 +306,7 @@ class AdminHomePage extends StatelessWidget {
   }
 
   IconData _getActivityIcon(String? status) {
-    switch (status) {
+    switch (status?.toLowerCase()) { // Added toLowerCase for case-insensitivity
       case 'approved':
         return Icons.check_circle;
       case 'rejected':
@@ -258,4 +317,4 @@ class AdminHomePage extends StatelessWidget {
         return Icons.help;
     }
   }
-} 
+}
