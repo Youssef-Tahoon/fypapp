@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:fyp_zakaty_app/auth/login_page.dart';
 import 'package:fyp_zakaty_app/auth/register_page.dart';
 import 'package:fyp_zakaty_app/auth/forgot_password_page.dart';
@@ -23,6 +24,8 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  WidgetsFlutterBinding.ensureInitialized();
+  Stripe.publishableKey = 'pk_test_51RdC7uGaSpItgJZmgzWOIoxbrK1ulSAqzqKTYy6FX94v8nDmHIrMTkpjieNaXrocAEi6Pvp6u2ggebbzBs0fBmuG00ZepxtW2I';
   runApp(
     MultiProvider(
       providers: [

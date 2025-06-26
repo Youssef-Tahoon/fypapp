@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_stripe/flutter_stripe.dart' as stripe;
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:fyp_zakaty_app/pages/zakat_calculator_page.dart';
 import 'package:fyp_zakaty_app/main.dart';
-import 'package:flutter_stripe/flutter_stripe.dart' as stripe;
+// import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:provider/provider.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../providers/user_provider.dart';
 
 class PayZakatPage extends StatefulWidget {
   const PayZakatPage({super.key});
@@ -29,6 +35,11 @@ class _PayZakatPageState extends State<PayZakatPage> {
       if (args != null && args.containsKey('amount')) {
         amountController.text = args['amount'].toString();
       }
+      // Autofill email from logged-in user
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      if (userProvider.user?.email != null) {
+        emailController.text = userProvider.user!.email!;
+      }
     });
   }
 
@@ -39,11 +50,11 @@ class _PayZakatPageState extends State<PayZakatPage> {
     try {
       // 1. Call your backend to create a PaymentIntent
       final response = await http.post(
-        Uri.parse('https://your-backend.com/create-payment-intent'), // <-- your backend endpoint
+        Uri.parse('https://buy.stripe.com/test_00w7sLbgm1v98JL1RxaEE01'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
-          'amount': (double.parse(amountController.text) * 100).toInt(), // in cents
-          'currency': 'myr', // or 'usd', etc.
+          'amount': (double.parse(amountController.text) * 100).toInt(),
+          'currency': 'myr',
           'email': emailController.text,
         }),
       );
@@ -72,6 +83,15 @@ class _PayZakatPageState extends State<PayZakatPage> {
       );
     } finally {
       setState(() => isProcessing = false);
+    }
+  }
+
+  Future<void> _launchStripeCheckout() async {
+    const url = 'https://buy.stripe.com/test_00w7sLbgm1v98JL1RxaEE01';
+    if (await canLaunch(url)) {
+      await launch(url);
+    } else {
+      throw 'Could not launch $url';
     }
   }
 
@@ -167,6 +187,10 @@ class _PayZakatPageState extends State<PayZakatPage> {
                     controller: amountController,
                     icon: Icons.attach_money,
                     keyboardType: TextInputType.number,
+                    maxLength: 10,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'^[0-9]+(\.[0-9]{0,2})?')),
+                    ],
                   ),
                   _buildTextField(
                     label: 'Full Name',
@@ -178,18 +202,23 @@ class _PayZakatPageState extends State<PayZakatPage> {
                     controller: emailController,
                     icon: Icons.email,
                     keyboardType: TextInputType.emailAddress,
+                    readOnly: true,
                   ),
                   _buildTextField(
                     label: 'Phone Number',
                     controller: phoneController,
                     icon: Icons.phone,
                     keyboardType: TextInputType.phone,
+                    maxLength: 12,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
                   ),
                   const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: isProcessing ? null : processPayment,
+                      onPressed: isProcessing ? null : _launchStripeCheckout,
                       icon: isProcessing
                           ? Container(
                               width: 24,
@@ -249,7 +278,8 @@ class _PayZakatPageState extends State<PayZakatPage> {
     required String description,
     required double raised,
     required double goal,
-  }) {
+  })
+   {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       child: Padding(
@@ -291,6 +321,8 @@ class _PayZakatPageState extends State<PayZakatPage> {
     String? hint,
     TextInputType? keyboardType,
     int? maxLength,
+    bool readOnly = false,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -298,6 +330,8 @@ class _PayZakatPageState extends State<PayZakatPage> {
         controller: controller,
         keyboardType: keyboardType ?? TextInputType.text,
         maxLength: maxLength,
+        readOnly: readOnly,
+        inputFormatters: inputFormatters,
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,
