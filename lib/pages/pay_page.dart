@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:fyp_zakaty_app/pages/zakat_calculator_page.dart';
-import 'package:fyp_zakaty_app/main.dart';
 import 'package:flutter_stripe/flutter_stripe.dart' as stripe;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -140,139 +138,99 @@ class _PayZakatPageState extends State<PayZakatPage> {
     return true;
   }
 
+  // This method is no longer used but kept for reference
   void contributeToCase(String caseName) {
-    // Placeholder: Logic to contribute to selected case
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Contributed to: $caseName")),
-    );
+    // Functionality removed
   }
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Pay Zakat'),
-          bottom: TabBar(
-            tabs: const [
-              Tab(text: 'Pay to Admin'),
-              Tab(text: 'Support a Case'),
-            ],
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Pay Zakat'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.history),
+            tooltip: 'Payment History',
+            onPressed: () {
+              Navigator.pushNamed(context, '/payment-history');
+            },
           ),
-          actions: [
-            IconButton(
-              icon: Icon(Icons.history),
-              tooltip: 'Payment History',
-              onPressed: () {
-                Navigator.pushNamed(context, '/payment-history');
-              },
-            ),
-          ],
-        ),
-        body: TabBarView(
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ElevatedButton(
-                    onPressed: () =>
-                        Navigator.pushNamed(context, '/zakat_calculator'),
-                    child: const Text("Calculate My Zakat"),
-                  ),
-                  const SizedBox(height: 20),
-                  _buildTextField(
-                    label: 'Amount (RM)',
-                    controller: amountController,
-                    icon: Icons.attach_money,
-                    keyboardType: TextInputType.number,
-                    maxLength: 10,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(
-                        RegExp(r'^\d+\.?\d{0,2}'),
-                      ),
-                    ],
-                  ),
-                  _buildTextField(
-                    label: 'Full Name',
-                    controller: nameController,
-                    icon: Icons.person,
-                  ),
-                  _buildTextField(
-                    label: 'Email',
-                    controller: emailController,
-                    icon: Icons.email,
-                    keyboardType: TextInputType.emailAddress,
-                    readOnly: true,
-                  ),
-                  _buildTextField(
-                    label: 'Phone Number',
-                    controller: phoneController,
-                    icon: Icons.phone,
-                    keyboardType: TextInputType.phone,
-                    maxLength: 12,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(
-                        RegExp(r'^\d{0,12}'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: isProcessing ? null : _launchStripeCheckout,
-                      icon: isProcessing
-                          ? Container(
-                              width: 24,
-                              height: 24,
-                              padding: const EdgeInsets.all(2.0),
-                              child: const CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 3,
-                              ),
-                            )
-                          : const Icon(Icons.payment),
-                      label: Text(isProcessing ? 'Processing...' : 'Pay Now'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green.shade700,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            ElevatedButton(
+              onPressed: () =>
+                  Navigator.pushNamed(context, '/zakat-calculator'),
+              child: const Text("Calculate My Zakat"),
             ),
-            ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _buildCaseCard(
-                  title: "Medical Emergency",
-                  description: "Help fund urgent surgery for a child in need.",
-                  raised: 2400,
-                  goal: 5000,
-                ),
-                _buildCaseCard(
-                  title: "Education Fund",
-                  description:
-                      "Support orphans in completing their school year.",
-                  raised: 1200,
-                  goal: 3000,
-                ),
-                _buildCaseCard(
-                  title: "Debt Relief",
-                  description:
-                      "Assist a struggling family with urgent debt payment.",
-                  raised: 800,
-                  goal: 2000,
+            const SizedBox(height: 20),
+            _buildTextField(
+              label: 'Amount (RM)',
+              controller: amountController,
+              icon: Icons.attach_money,
+              keyboardType: TextInputType.number,
+              maxLength: 10,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(
+                  RegExp(r'^\d+\.?\d{0,2}'),
                 ),
               ],
+            ),
+            _buildTextField(
+              label: 'Full Name',
+              controller: nameController,
+              icon: Icons.person,
+            ),
+            _buildTextField(
+              label: 'Email',
+              controller: emailController,
+              icon: Icons.email,
+              keyboardType: TextInputType.emailAddress,
+              readOnly: true,
+            ),
+            _buildTextField(
+              label: 'Phone Number',
+              controller: phoneController,
+              icon: Icons.phone,
+              keyboardType: TextInputType.phone,
+              maxLength: 12,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(
+                  RegExp(r'^\d{0,12}'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: isProcessing ? null : _launchStripeCheckout,
+                icon: isProcessing
+                    ? Container(
+                        width: 24,
+                        height: 24,
+                        padding: const EdgeInsets.all(2.0),
+                        child: const CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 3,
+                        ),
+                      )
+                    : const Icon(Icons.payment),
+                label: Text(isProcessing ? 'Processing...' : 'Pay Now'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade700,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -280,46 +238,7 @@ class _PayZakatPageState extends State<PayZakatPage> {
     );
   }
 
-  Widget _buildCaseCard({
-    required String title,
-    required String description,
-    required double raised,
-    required double goal,
-  }) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title,
-                style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text(description),
-            const SizedBox(height: 12),
-            LinearProgressIndicator(
-              value: (raised / goal).clamp(0.0, 1.0),
-              color: Colors.green,
-              backgroundColor: Colors.grey[200],
-            ),
-            const SizedBox(height: 8),
-            Text(
-                "Raised: RM ${raised.toStringAsFixed(2)} / RM ${goal.toStringAsFixed(2)}"),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight,
-              child: ElevatedButton(
-                onPressed: () => contributeToCase(title),
-                child: const Text("Contribute"),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // _buildCaseCard method removed as it's no longer needed
 
   Widget _buildTextField({
     required String label,

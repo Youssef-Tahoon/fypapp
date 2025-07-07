@@ -61,9 +61,43 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(e.toString())));
+          // Provide user-friendly error message
+          String errorMessage = 'Login failed';
+
+          // Handle common Firebase auth errors with user-friendly messages
+          if (e.toString().contains('user-not-found') ||
+              e.toString().contains('wrong-password') ||
+              e.toString().contains('invalid-credential')) {
+            errorMessage = 'Email and password do not match. Please try again.';
+          } else if (e.toString().contains('too-many-requests')) {
+            errorMessage =
+                'Too many failed login attempts. Please try again later.';
+          } else if (e.toString().contains('network-request-failed')) {
+            errorMessage =
+                'Network error. Please check your internet connection.';
+          } else if (e.toString().contains('user-disabled')) {
+            errorMessage =
+                'This account has been disabled. Please contact support.';
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.error_outline, color: Colors.white),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      errorMessage,
+                      style: TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 4),
+            ),
+          );
         }
       }
     }
@@ -71,12 +105,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _handleLogoTap() {
     final now = DateTime.now();
-    if (_lastTapTime != null && 
+    if (_lastTapTime != null &&
         now.difference(_lastTapTime!) > Duration(seconds: 3)) {
       _adminTapCount = 0;
     }
     _lastTapTime = now;
-    
+
     setState(() {
       _adminTapCount++;
       if (_adminTapCount >= _adminTapThreshold) {

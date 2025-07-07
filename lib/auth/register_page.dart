@@ -68,21 +68,84 @@ class _SignUpScreenState extends State<SignUpScreen> {
     if (_formKey.currentState!.validate()) {
       try {
         final userProvider = Provider.of<UserProvider>(context, listen: false);
+        
+        // Set loading indicator
+        setState(() {});
+        
         await userProvider.register(
           emailController.text.trim(),
           passController.text,
         );
 
-        if (mounted && userProvider.isAuthenticated) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => MainNavigation()),
+        // Firebase auth listener in UserProvider will update the user
+        // Check after a short delay to ensure auth state has propagated
+        await Future.delayed(Duration(milliseconds: 500));
+        
+        if (mounted) {
+          // Show success message whether or not userProvider.isAuthenticated is true yet
+          // The Firebase auth state might take a moment to update
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 10),
+                  Text(
+                    'Registration successful! Welcome to ZakatApp',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 3),
+            ),
           );
+          
+          // Short delay to allow user to see the success message
+          await Future.delayed(Duration(seconds: 1));
+          
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => MainNavigation()),
+            );
+          }
         }
       } catch (e) {
+        print('Registration error: ${e.toString()}');
+        
         if (mounted) {
+          // Display user-friendly error message
+          String errorMessage = 'Registration failed';
+          
+          // Extract more specific error messages if available
+          if (e.toString().contains('email-already-in-use')) {
+            errorMessage = 'This email is already registered. Please use a different email or try logging in.';
+          } else if (e.toString().contains('weak-password')) {
+            errorMessage = 'Password is too weak. Please choose a stronger password.';
+          } else if (e.toString().contains('invalid-email')) {
+            errorMessage = 'The email address is not valid. Please check and try again.';
+          } else if (e.toString().contains('network')) {
+            errorMessage = 'Network error. Please check your internet connection and try again.';
+          }
+          
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e.toString())),
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.error_outline, color: Colors.white),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      errorMessage,
+                      style: TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 5),
+            ),
           );
         }
       }

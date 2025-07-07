@@ -224,8 +224,8 @@ class _CasesPageState extends State<CasesPage> {
                                   });
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('Failed to upload PDF. Please try again.'),
-                                      backgroundColor: Colors.red,
+                                      content: Text('PDF upload cancelled or failed.'),
+                                      backgroundColor: Colors.orange,
                                     ),
                                   );
                                 }
@@ -242,11 +242,16 @@ class _CasesPageState extends State<CasesPage> {
                               }
                             },
                       icon: Icon(isUploading ? Icons.hourglass_empty : Icons.upload_file),
-                      label: Text(isUploading ? 'Uploading...' : 'Upload PDF Proof'),
+                      label: Text(isUploading ? 'Uploading...' : 'Upload PDF Proof (Optional)'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColor.kPrimary,
                         foregroundColor: Colors.white,
                       ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'PDF proof is optional for demonstration purposes',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 12, fontStyle: FontStyle.italic),
                     ),
                     if (pdfUrl != null) ...[
                       SizedBox(height: 8),
@@ -303,10 +308,11 @@ class _CasesPageState extends State<CasesPage> {
                       hasError = true;
                     }
                     
-                    if (pdfUrl == null) {
-                      dialogState.pdfError = 'Please upload a PDF proof document';
-                      hasError = true;
-                    }
+                    // PDF is now optional
+                    // if (pdfUrl == null) {
+                    //   dialogState.pdfError = 'Please upload a PDF proof document';
+                    //   hasError = true;
+                    // }
                     
                     if (hasError) {
                       setDialogState(() {}); // Update the UI to show errors
@@ -320,7 +326,7 @@ class _CasesPageState extends State<CasesPage> {
                         amountNeeded: amount,
                         submittedBy: userProvider.user!.uid,
                         userEmail: userProvider.user!.email ?? '',
-                        proofUrl: pdfUrl,
+                        proofUrl: pdfUrl, // This can now be null
                       ),
                     );
                     Navigator.pop(context);
