@@ -7,6 +7,9 @@ class PaymentHistory {
   final String destination;
   final DateTime timestamp;
   final String receiptNumber;
+  final String paymentId;
+  final String userEmail;
+  final String status;
 
   PaymentHistory({
     required this.id,
@@ -15,6 +18,9 @@ class PaymentHistory {
     required this.destination,
     required this.timestamp,
     required this.receiptNumber,
+    this.paymentId = '',
+    this.userEmail = '',
+    this.status = 'completed',
   });
 
   factory PaymentHistory.fromFirestore(DocumentSnapshot doc) {
@@ -26,6 +32,9 @@ class PaymentHistory {
       destination: data['destination'] ?? '',
       timestamp: (data['timestamp'] as Timestamp).toDate(),
       receiptNumber: data['receiptNumber'] ?? '',
+      paymentId: data['paymentId'] ?? '',
+      userEmail: data['userEmail'] ?? '',
+      status: data['status'] ?? 'completed',
     );
   }
 
@@ -36,6 +45,9 @@ class PaymentHistory {
       'destination': destination,
       'timestamp': Timestamp.fromDate(timestamp),
       'receiptNumber': receiptNumber,
+      'paymentId': paymentId,
+      'userEmail': userEmail,
+      'status': status,
     };
   }
 } 

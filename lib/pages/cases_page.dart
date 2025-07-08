@@ -43,7 +43,6 @@ class _CasesPageState extends State<CasesPage> {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf'],
-        // Allow all PDF files - we'll check size manually
         withData: true,
       );
 
@@ -54,7 +53,7 @@ class _CasesPageState extends State<CasesPage> {
         print('File path: ${file.path}');
         print('Has bytes: ${file.bytes != null}');
         
-        // Check if file is too large (10MB limit for Firestore documents)
+        // Check if file is too large (10MB limit documents)
         if (file.size > 10 * 1024 * 1024) {
           print('Error: File is too large (max 10MB)');
           throw Exception('PDF file is too large (max 10MB). Please select a smaller file.');
@@ -145,16 +144,16 @@ class _CasesPageState extends State<CasesPage> {
     bool isUploading = false;
     final dialogState = DialogState();
 
-    // Add listeners for character counting
+    //listeners for character counting
     titleController.addListener(() {
       if (context.mounted) {
-        setState(() {}); // This will update the counter display
+        setState(() {});
       }
     });
 
     descriptionController.addListener(() {
       if (context.mounted) {
-        setState(() {}); // This will update the counter display
+        setState(() {});
       }
     });
 
@@ -296,7 +295,7 @@ class _CasesPageState extends State<CasesPage> {
                     ),
                     SizedBox(height: 8),
                     Text(
-                      'PDF proof is optional for demonstration purposes',
+                      'PDF proof is for proof purposes',
                       style: TextStyle(color: Colors.grey[600], fontSize: 12, fontStyle: FontStyle.italic),
                     ),
                     if (pdfData != null) ...[
@@ -363,14 +362,8 @@ class _CasesPageState extends State<CasesPage> {
                       hasError = true;
                     }
                     
-                    // PDF is now optional
-                    // if (pdfUrl == null) {
-                    //   dialogState.pdfError = 'Please upload a PDF proof document';
-                    //   hasError = true;
-                    // }
-                    
                     if (hasError) {
-                      setDialogState(() {}); // Update the UI to show errors
+                      setDialogState(() {});
                       return;
                     }
                     

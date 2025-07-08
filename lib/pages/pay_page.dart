@@ -53,8 +53,15 @@ class _PayZakatPageState extends State<PayZakatPage> {
           'amount': (double.parse(amountController.text) * 100).toInt(),
           'currency': 'myr',
           'email': emailController.text,
+          'name': nameController.text,
+          'phone': phoneController.text,
         }),
       );
+      
+      if (response.statusCode != 200) {
+        throw Exception('Error from payment server: ${response.body}');
+      }
+      
       final paymentIntent = json.decode(response.body);
 
       // 2. Initialize payment sheet
@@ -68,27 +75,108 @@ class _PayZakatPageState extends State<PayZakatPage> {
 
       // 3. Present payment sheet
       await stripe.Stripe.instance.presentPaymentSheet();
-
-      Fluttertoast.showToast(
-        msg: "Payment Successful!",
-        toastLength: Toast.LENGTH_LONG,
-      );
+      
+      // 4. Payment was successful, navigate to success page
+      final paymentId = paymentIntent['paymentIntentId'] ?? 'STRIPE-${DateTime.now().millisecondsSinceEpoch}';
+      final receiptNumber = 'ZKT-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}';
+      final amount = double.parse(amountController.text);
+      
+      if (mounted) {
+        Navigator.pushReplacementNamed(
+          context, 
+          '/payment-success',
+          arguments: {
+            'amount': amount,
+            'paymentId': paymentId,
+            'receiptNumber': receiptNumber,
+            'timestamp': DateTime.now(),
+            'destination': _getDestinationText(),
+          },
+        );
+      }
     } catch (e) {
-      Fluttertoast.showToast(
-        msg: "Payment failed: $e",
-        toastLength: Toast.LENGTH_LONG,
-      );
+      if (mounted) {
+        Fluttertoast.showToast(
+          msg: "Payment failed: ${e.toString().split('\n')[0]}", // Get first line of error
+          toastLength: Toast.LENGTH_LONG,
+        );
+      }
     } finally {
-      setState(() => isProcessing = false);
+      if (mounted) {
+        setState(() => isProcessing = false);
+      }
     }
   }
 
   Future<void> _launchStripeCheckout() async {
-    const url = 'https://buy.stripe.com/test_00w7sLbgm1v98JL1RxaEE01';
-    if (await canLaunch(url)) {
-      await launch(url);
-    } else {
-      throw 'Could not launch $url';
+    if (!_validateFields()) return;
+    
+    setState(() => isProcessing = true);
+    
+    try {
+      const url = 'https://buy.stripe.com/test_00w7sLbgm1v98JL1RxaEE01';
+      
+      // In a real app, we'd generate a dynamic URL with these parameters
+      if (await canLaunch(url)) {
+        await launch(url);
+        
+        // For demonstration purposes, we'll show a dialog asking if payment was successful
+        // In a real app, you would get a webhook notification from Stripe
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: Text('Did you complete payment?'),
+              content: Text('Since this is a test app without a backend, we need your confirmation.'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context); // Close dialog
+                    setState(() => isProcessing = false);
+                  },
+                  child: Text('No'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context); // Close dialog
+                    
+                    // Simulate a successful payment
+                    final paymentId = 'MANUAL-${DateTime.now().millisecondsSinceEpoch}';
+                    final receiptNumber = 'ZKT-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}';
+                    final amount = double.parse(amountController.text);
+                    
+                    Navigator.pushReplacementNamed(
+                      context, 
+                      '/payment-success',
+                      arguments: {
+                        'amount': amount,
+                        'paymentId': paymentId,
+                        'receiptNumber': receiptNumber,
+                        'timestamp': DateTime.now(),
+                        'destination': _getDestinationText(),
+                      },
+                    );
+                  },
+                  child: Text('Yes, payment completed'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+      } else {
+        throw 'Could not launch payment page';
+      }
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: "Error: ${e.toString()}",
+        toastLength: Toast.LENGTH_LONG,
+      );
+      setState(() => isProcessing = false);
     }
   }
 
@@ -136,6 +224,12 @@ class _PayZakatPageState extends State<PayZakatPage> {
     }
 
     return true;
+  }
+
+  // Get the destination text for the payment
+  String _getDestinationText() {
+    // This could be made more dynamic based on user selection or other factors
+    return 'Zakat Fitrah Payment';
   }
 
   // This method is no longer used but kept for reference

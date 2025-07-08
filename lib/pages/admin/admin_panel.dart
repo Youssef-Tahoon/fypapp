@@ -5,6 +5,7 @@ import 'case_approval_page.dart';
 import 'manage_users_page.dart';
 import 'manage_charities_page.dart';
 import 'admin_home_page.dart';
+import 'receipt_management_page.dart';
 
 class AdminPanel extends StatefulWidget {
   @override
@@ -19,6 +20,7 @@ class _AdminPanelState extends State<AdminPanel> {
     CaseApprovalPage(),
     ManageUsersPage(),
     ManageCharitiesPage(),
+    ReceiptManagementPage(),
   ];
 
   @override
@@ -81,6 +83,10 @@ class _AdminPanelState extends State<AdminPanel> {
             icon: Icon(Icons.volunteer_activism),
             label: 'Charities',
           ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.receipt_long),
+            label: 'Receipts',
+          ),
         ],
         onTap: (index) {
           setState(() {
@@ -101,6 +107,8 @@ class _AdminPanelState extends State<AdminPanel> {
         return 'Manage Users';
       case 3:
         return 'Manage Charities';
+      case 4:
+        return 'Receipt Management';
       default:
         return 'Admin Panel';
     }

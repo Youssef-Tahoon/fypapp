@@ -5,6 +5,7 @@ import 'package:fyp_zakaty_app/auth/register_page.dart';
 import 'package:fyp_zakaty_app/auth/forgot_password_page.dart';
 import 'package:fyp_zakaty_app/pages/first_page.dart';
 import 'package:fyp_zakaty_app/pages/payment_history_page.dart';
+import 'package:fyp_zakaty_app/pages/payment_success_page.dart';
 import 'package:provider/provider.dart';
 import 'pages/home_page.dart';
 import 'pages/cases_page.dart';
@@ -16,6 +17,7 @@ import 'providers/user_provider.dart';
 import 'providers/admin_provider.dart';
 import 'auth/admin_login_page.dart';
 import 'pages/admin/admin_panel.dart';
+import 'pages/admin/receipt_management_page.dart';
 import 'firebase_options.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 
@@ -44,15 +46,33 @@ class ZakatApp extends StatelessWidget {
     return MaterialApp(
       title: 'ZakatEase',
       theme: ThemeData(
-        primarySwatch: Colors.purple,
+        primarySwatch: Colors.green,
+        primaryColor: Colors.green.shade700,
         scaffoldBackgroundColor: Color(0xFFF8FAFC),
+        colorScheme: ColorScheme.light(
+          primary: Colors.green.shade700,
+          secondary: Colors.green.shade600,
+        ),
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.green.shade700,
+          foregroundColor: Colors.white,
+        ),
+        bottomNavigationBarTheme: BottomNavigationBarThemeData(
+          backgroundColor: Colors.white,
+          selectedItemColor: Colors.green.shade700,
+          unselectedItemColor: Colors.grey.shade600,
+          elevation: 10,
+          type: BottomNavigationBarType.fixed,
+        ),
       ),
       initialRoute: '/',
       routes: {
         '/main_navigation': (context) => MainNavigation(),
+        '/home': (context) => HomePage(),
         '/zakat-calculator': (context) => const ZakatCalculatorPage(),
         '/pay-zakat': (context) => const PayZakatPage(),
         '/payment-history': (context) => PaymentHistoryPage(),
+        '/payment-success': (context) => PaymentSuccessPage(),
         '/register': (context) => SignUpScreen(),
         '/login': (context) => LoginScreen(),
         '/': (context) => OnboardingScreen(),
@@ -60,6 +80,7 @@ class ZakatApp extends StatelessWidget {
         // Admin routes
         '/admin-login': (context) => AdminLoginScreen(),
         '/admin-panel': (context) => AdminPanel(),
+        '/admin/receipt-management': (context) => ReceiptManagementPage(),
       },
     );
   }
@@ -106,7 +127,11 @@ class _MainNavigationState extends State<MainNavigation> {
       body: _pages[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
-        selectedItemColor: Colors.green.shade600,
+        selectedItemColor: Colors.green.shade700,
+        unselectedItemColor: Colors.grey.shade600,
+        backgroundColor: Colors.white,
+        elevation: 10,
+        type: BottomNavigationBarType.fixed,
         onTap: (index) {
           setState(() {
             _currentIndex = index;
