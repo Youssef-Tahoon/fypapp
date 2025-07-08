@@ -2,12 +2,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:convert';
+import 'dart:io';
 import '../providers/case_provider.dart';
 import '../providers/user_provider.dart';
 import '../models/case_model.dart';
 import '../colors/colors.dart';
 import 'package:flutter/services.dart';
+import '../widgets/pdf_preview_widget.dart';
 
 // Dialog state class to hold form validation states
 class DialogState {
@@ -34,13 +36,15 @@ class _CasesPageState extends State<CasesPage> {
     });
   }
 
-  Future<String?> _uploadPdf() async {
+  Future<Map<String, dynamic>?> _uploadPdf() async {
     try {
-      print('Starting PDF upload process...');
+      print('Starting PDF selection process...');
       
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf'],
+        // Allow all PDF files - we'll check size manually
+        withData: true,
       );
 
       if (result != null) {
@@ -48,10 +52,41 @@ class _CasesPageState extends State<CasesPage> {
         print('File selected: ${file.name}');
         print('File size: ${file.size} bytes');
         print('File path: ${file.path}');
-        print('File bytes: ${file.bytes?.length ?? 'null'}');
+        print('Has bytes: ${file.bytes != null}');
+        
+        // Check if file is too large (10MB limit for Firestore documents)
+        if (file.size > 10 * 1024 * 1024) {
+          print('Error: File is too large (max 10MB)');
+          throw Exception('PDF file is too large (max 10MB). Please select a smaller file.');
+        }
 
         if (file.bytes == null) {
           print('Error: File bytes are null');
+          // Try to read the file using path instead if bytes are null
+          try {
+            if (file.path != null) {
+              final bytes = await File(file.path!).readAsBytes();
+              if (bytes.isNotEmpty) {
+                print('Successfully read ${bytes.length} bytes from file path');
+                
+                // Encode bytes to base64
+                final base64String = base64Encode(bytes);
+                final base64File = 'data:application/pdf;base64,$base64String';
+                
+                print('Successfully encoded PDF from path to base64 format (${base64String.length} chars)');
+                
+                // Return PDF data
+                return {
+                  'pdfName': file.name,
+                  'pdfSize': bytes.length,
+                  'pdfData': base64File,
+                  'uploadTime': DateTime.now().toIso8601String(),
+                };
+              }
+            }
+          } catch (e) {
+            print('Error reading file from path: $e');
+          }
           return null;
         }
 
@@ -60,46 +95,44 @@ class _CasesPageState extends State<CasesPage> {
           return null;
         }
 
-        final fileName = '${DateTime.now().millisecondsSinceEpoch}_${file.name}';
-        print('Uploading file: $fileName');
-
-        final storageRef = FirebaseStorage.instance
-            .ref()
-            .child('case_proofs')
-            .child(fileName);
-
-        print('Storage reference created: ${storageRef.fullPath}');
-
-        final uploadTask = await storageRef.putData(
-          file.bytes!,
-          SettableMetadata(
-            contentType: 'application/pdf',
-            customMetadata: {
-              'originalName': file.name,
-              'uploadedAt': DateTime.now().toIso8601String(),
-            },
-          ),
-        );
-
-        print('Upload task completed');
-        print('Bytes uploaded: ${uploadTask.bytesTransferred}');
-
-        final downloadUrl = await uploadTask.ref.getDownloadURL();
-        print('Download URL obtained: $downloadUrl');
-
-        return downloadUrl;
+        try {
+          // Convert PDF bytes to base64 string for storage in Firestore
+          final bytes = file.bytes!;
+          final base64String = base64Encode(bytes);
+          final base64File = 'data:application/pdf;base64,$base64String';
+          
+          print('Successfully encoded PDF to base64 format (${base64String.length} chars)');
+          
+          // Return PDF data
+          return {
+            'pdfName': file.name,
+            'pdfSize': file.size,
+            'pdfData': base64File,
+            'uploadTime': DateTime.now().toIso8601String(),
+          };
+        } catch (e) {
+          print('Error encoding PDF: $e');
+          throw Exception('Error processing the PDF file. Please try again with a different file.');
+        }
       } else {
         print('No file selected');
         return null;
       }
     } catch (e) {
-      print('Error uploading PDF: $e');
+      print('Error with PDF: $e');
       print('Error type: ${e.runtimeType}');
-      if (e is FirebaseException) {
-        print('Firebase error code: ${e.code}');
-        print('Firebase error message: ${e.message}');
+      
+      // Add specific error messages based on the error type
+      if (e is FileSystemException) {
+        throw Exception('File system error: ${e.message}. Please try another file.');
+      } else if (e.toString().contains('bytes')) {
+        throw Exception('Could not read file data. Please try another file.');
+      } else if (e.toString().contains('encode') || e.toString().contains('base64')) {
+        throw Exception('Could not encode the PDF file. The file may be corrupted.');
+      } else {
+        // Rethrow the original exception
+        rethrow;
       }
-      return null;
     }
   }
 
@@ -108,7 +141,7 @@ class _CasesPageState extends State<CasesPage> {
     final descriptionController = TextEditingController();
     final amountController = TextEditingController();
     final userProvider = context.read<UserProvider>();
-    String? pdfUrl;
+    Map<String, dynamic>? pdfData;
     bool isUploading = false;
     final dialogState = DialogState();
 
@@ -146,16 +179,16 @@ class _CasesPageState extends State<CasesPage> {
                   children: [
                     TextField(
                       controller: titleController,
-                      maxLength: 25,
+                      maxLength: 40,
                       decoration: InputDecoration(
                         labelText: 'Case Title',
-                        hintText: 'Enter a brief title (max 25 characters)',
+                        hintText: 'Enter a brief title (max 40 characters)',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        counterText: '${titleController.text.length}/25',
+                        counterText: '${titleController.text.length}/40',
                         counterStyle: TextStyle(
-                          color: titleController.text.length > 25 
+                          color: titleController.text.length > 40 
                               ? Colors.red 
                               : Colors.grey,
                         ),
@@ -207,35 +240,48 @@ class _CasesPageState extends State<CasesPage> {
                           : () async {
                               setDialogState(() => isUploading = true);
                               try {
-                                pdfUrl = await _uploadPdf();
-                                if (pdfUrl != null) {
+                                print('Starting PDF upload process...');
+                                pdfData = await _uploadPdf();
+                                if (pdfData != null) {
+                                  print('PDF data received successfully');
                                   setDialogState(() {
                                     isUploading = false;
                                   });
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('PDF uploaded successfully!'),
+                                      content: Text('PDF selected successfully: ${pdfData!['pdfName']}'),
                                       backgroundColor: Colors.green,
                                     ),
                                   );
                                 } else {
+                                  print('PDF selection returned null');
                                   setDialogState(() {
                                     isUploading = false;
                                   });
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('PDF upload cancelled or failed.'),
+                                      content: Text('PDF selection cancelled or failed.'),
                                       backgroundColor: Colors.orange,
                                     ),
                                   );
                                 }
                               } catch (e) {
+                                print('Error in PDF upload button: $e');
                                 setDialogState(() {
                                   isUploading = false;
                                 });
+                                
+                                // Display a user-friendly error message
+                                String errorMessage = 'Error with PDF';
+                                if (e.toString().contains('too large')) {
+                                  errorMessage = 'PDF file is too large (max 10MB).';
+                                } else if (e.toString().contains('permission')) {
+                                  errorMessage = 'Cannot access file. Please check permissions.';
+                                }
+                                
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text('Error uploading PDF: $e'),
+                                    content: Text(errorMessage),
                                     backgroundColor: Colors.red,
                                   ),
                                 );
@@ -253,11 +299,20 @@ class _CasesPageState extends State<CasesPage> {
                       'PDF proof is optional for demonstration purposes',
                       style: TextStyle(color: Colors.grey[600], fontSize: 12, fontStyle: FontStyle.italic),
                     ),
-                    if (pdfUrl != null) ...[
+                    if (pdfData != null) ...[
                       SizedBox(height: 8),
-                      Text(
-                        'PDF uploaded successfully!',
-                        style: TextStyle(color: Colors.green),
+                      Row(
+                        children: [
+                          Icon(Icons.check_circle, color: Colors.green, size: 16),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Selected PDF: ${pdfData!['pdfName']} (${(pdfData!['pdfSize'] / 1024).toStringAsFixed(1)} KB)',
+                              style: TextStyle(color: Colors.green),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                     if (dialogState.pdfError != null) ...[
@@ -298,8 +353,8 @@ class _CasesPageState extends State<CasesPage> {
                     if (description.isEmpty) {
                       dialogState.descriptionError = 'Please enter a description';
                       hasError = true;
-                    } else if (description.length < 25) {
-                      dialogState.descriptionError = 'Description must be at least 25 characters';
+                    } else if (description.length < 40) {
+                      dialogState.descriptionError = 'Description must be at least 40 characters';
                       hasError = true;
                     }
                     
@@ -326,7 +381,8 @@ class _CasesPageState extends State<CasesPage> {
                         amountNeeded: amount,
                         submittedBy: userProvider.user!.uid,
                         userEmail: userProvider.user!.email ?? '',
-                        proofUrl: pdfUrl, // This can now be null
+                        proofUrl: pdfData != null ? pdfData!['pdfName'] : null,
+                        pdfData: pdfData, // Store the entire PDF data object
                       ),
                     );
                     Navigator.pop(context);
@@ -347,6 +403,82 @@ class _CasesPageState extends State<CasesPage> {
       },
     );
   }
+
+  // Show PDF preview dialog for admins or users
+  void _showPdfPreview(BuildContext context, Case caseItem) {
+    if (caseItem.pdfData == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No PDF data available')),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Container(
+            padding: EdgeInsets.all(16),
+            constraints: BoxConstraints(maxWidth: 600, maxHeight: 600),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'PDF Document: ${caseItem.pdfData!['pdfName']}',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 16),
+                Expanded(
+                  child: PdfPreviewWidget(
+                    pdfData: caseItem.pdfData!,
+                    isAdmin: _isAdmin(context),
+                  ),
+                ),
+                SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text('Close'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Check if current user is an admin
+  bool _isAdmin(BuildContext context) {
+    final userProvider = context.read<UserProvider>();
+    // You'd typically check a role field in your user data
+    // For this example, let's say users with certain emails are admins
+    return userProvider.isAuthenticated && 
+           (userProvider.user!.email?.endsWith('@admin.com') ?? false);
+  }
+
+  // Method removed - functionality moved to PdfPreviewWidget
 
   @override
   Widget build(BuildContext context) {
@@ -429,11 +561,11 @@ class _CasesPageState extends State<CasesPage> {
                               ),
                             ],
                           ),
-                          if (caseItem.proofUrl != null)
+                          if (caseItem.pdfData != null)
                             IconButton(
                               icon: Icon(Icons.description),
                               onPressed: () {
-                                // TODO: Implement PDF viewer
+                                _showPdfPreview(context, caseItem);
                               },
                               tooltip: 'View Proof Document',
                             ),

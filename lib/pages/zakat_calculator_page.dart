@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import '../widgets/zakat_input_field.dart';
+import '../services/metal_price_service.dart';
+import '../widgets/zakat/price_info_card.dart';
+import '../widgets/zakat/result_widgets.dart';
+import '../widgets/zakat/nisab_checker.dart';
 
 class ZakatCalculatorPage extends StatefulWidget {
   const ZakatCalculatorPage({super.key});
@@ -32,12 +36,44 @@ class _ZakatCalculatorPageState extends State<ZakatCalculatorPage> {
   bool goldEligible = true;
   bool silverEligible = true;
   bool salaryEligible = true;
+  bool isLoading = true;
 
-  final double goldPricePerGram = 455.8;
-  final double silverPricePerGram = 4.94;
+  // Default values until API fetches real-time prices
+  double goldPricePerGram = 455.8;
+  double silverPricePerGram = 4.94;
+  DateTime? lastUpdated;
+
   final double nisabGoldGrams = 85.0;
   final double nisabSilverGrams = 595.0;
-  final double minMonthlySalary = 2400.0;
+  final double minMonthlySalary = 3200.0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Fetch metal prices when the page loads
+    _fetchMetalPrices();
+  }
+
+  Future<void> _fetchMetalPrices() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final metalPrices = await MetalPriceService.getMetalPrices();
+      setState(() {
+        goldPricePerGram = metalPrices.goldPricePerGram;
+        silverPricePerGram = metalPrices.silverPricePerGram;
+        lastUpdated = metalPrices.lastUpdated;
+        isLoading = false;
+      });
+    } catch (e) {
+      print('Error fetching metal prices: $e');
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
 
   void calculateZakat() {
     double goldGrams = double.tryParse(goldController.text) ?? 0;
@@ -55,7 +91,14 @@ class _ZakatCalculatorPageState extends State<ZakatCalculatorPage> {
     silverValue = silverGrams * silverPricePerGram;
     salaryValue = monthlySalary * 12;
 
-    totalAssets = goldValue + silverValue + salaryValue + cash + investment + property + business + other;
+    totalAssets = goldValue +
+        silverValue +
+        salaryValue +
+        cash +
+        investment +
+        property +
+        business +
+        other;
     totalLiabilities = debts + expenses;
     netWorth = totalAssets - totalLiabilities;
 
@@ -91,17 +134,100 @@ class _ZakatCalculatorPageState extends State<ZakatCalculatorPage> {
     });
   }
 
+  // New method to check Nisab eligibility without calculating full zakat
+  void checkNisab() {
+    double goldGrams = double.tryParse(goldController.text) ?? 0;
+    double silverGrams = double.tryParse(silverController.text) ?? 0;
+    double monthlySalary = double.tryParse(salaryController.text) ?? 0;
+    double cash = double.tryParse(cashController.text) ?? 0;
+    double investments = double.tryParse(investmentController.text) ?? 0;
+    double otherAssets = double.tryParse(otherAssetsController.text) ?? 0;
+
+    bool goldEligible = goldGrams >= nisabGoldGrams;
+    bool silverEligible = silverGrams >= nisabSilverGrams;
+    bool salaryEligible = monthlySalary >= minMonthlySalary;
+    bool cashEligible = cash >= (nisabGoldGrams * goldPricePerGram);
+    bool investmentsEligible = investments >= (nisabGoldGrams * goldPricePerGram);
+    bool otherAssetsEligible = otherAssets >= (nisabGoldGrams * goldPricePerGram);
+
+    bool isEligible = goldEligible || silverEligible || salaryEligible || 
+                      cashEligible || investmentsEligible || otherAssetsEligible;
+
+    // Calculate values for display
+    double goldValue = goldGrams * goldPricePerGram;
+    double silverValue = silverGrams * silverPricePerGram;
+    double annualSalaryValue = monthlySalary * 12;
+
+    // Show the eligibility result in a dialog
+    _showNisabCheckDialog(
+      isEligible,
+      goldGrams,
+      silverGrams,
+      monthlySalary,
+      goldEligible,
+      silverEligible,
+      salaryEligible,
+      goldValue,
+      silverValue,
+      annualSalaryValue,
+      cash: cash,
+      investments: investments,
+      otherAssets: otherAssets,
+    );
+  }
+
+  // Show a dialog with detailed nisab eligibility information
+  void _showNisabCheckDialog(
+    bool isEligible,
+    double goldGrams,
+    double silverGrams,
+    double monthlySalary,
+    bool goldEligible,
+    bool silverEligible,
+    bool salaryEligible,
+    double goldValue,
+    double silverValue,
+    double annualSalaryValue,
+    {
+      double cash = 0.0,
+      double investments = 0.0,
+      double otherAssets = 0.0,
+    }
+  ) {
+    NisabChecker.showNisabCheckDialog(
+      context: context,
+      isEligible: isEligible,
+      goldGrams: goldGrams,
+      silverGrams: silverGrams,
+      monthlySalary: monthlySalary,
+      goldEligible: goldEligible,
+      silverEligible: silverEligible,
+      salaryEligible: salaryEligible,
+      goldValue: goldValue,
+      silverValue: silverValue,
+      annualSalaryValue: annualSalaryValue,
+      nisabGoldGrams: nisabGoldGrams,
+      nisabSilverGrams: nisabSilverGrams,
+      minMonthlySalary: minMonthlySalary,
+      goldPricePerGram: goldPricePerGram,
+      silverPricePerGram: silverPricePerGram,
+      calculateZakat: calculateZakat,
+      cash: cash,
+      investments: investments,
+      otherAssets: otherAssets,
+    );
+  }
+
   Widget _buildWarningNote(String message) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.yellow[100],
-        border: Border.all(color: Colors.orange),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(message, style: const TextStyle(color: Colors.black87)),
+    return WarningNote(message: message);
+  }
+
+  Widget _buildPriceInfoCard() {
+    return PriceInfoCard(
+      goldPricePerGram: goldPricePerGram,
+      silverPricePerGram: silverPricePerGram,
+      lastUpdated: lastUpdated,
+      isLoading: isLoading,
     );
   }
 
@@ -114,6 +240,13 @@ class _ZakatCalculatorPageState extends State<ZakatCalculatorPage> {
           title: const Text('Zakat Calculator'),
           backgroundColor: Colors.green.shade700,
           elevation: 0,
+          actions: [
+            IconButton(
+              icon: Icon(Icons.refresh),
+              tooltip: 'Refresh metal prices',
+              onPressed: _fetchMetalPrices,
+            ),
+          ],
         ),
         body: Container(
           decoration: BoxDecoration(
@@ -138,6 +271,9 @@ class _ZakatCalculatorPageState extends State<ZakatCalculatorPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Add the metal prices info card at the top
+                    _buildPriceInfoCard(),
+                    const SizedBox(height: 16),
                     if (!showResult) ...[
                       Text(
                         'Assets',
@@ -154,8 +290,10 @@ class _ZakatCalculatorPageState extends State<ZakatCalculatorPage> {
                         icon: Icons.monetization_on,
                       ),
                       if (double.tryParse(goldController.text) != null &&
-                          double.tryParse(goldController.text)! < nisabGoldGrams)
-                        _buildWarningNote("Gold amount is less than 85g. Not eligible for Zakat."),
+                          double.tryParse(goldController.text)! <
+                              nisabGoldGrams)
+                        _buildWarningNote(
+                            "Gold amount is less than 85g. Not eligible for Zakat."),
                       const SizedBox(height: 10),
                       ZakatInputField(
                         label: "Silver (grams)",
@@ -164,18 +302,22 @@ class _ZakatCalculatorPageState extends State<ZakatCalculatorPage> {
                         icon: Icons.monetization_on_outlined,
                       ),
                       if (double.tryParse(silverController.text) != null &&
-                          double.tryParse(silverController.text)! < nisabSilverGrams)
-                        _buildWarningNote("Silver amount is less than 595g. Not eligible for Zakat."),
+                          double.tryParse(silverController.text)! <
+                              nisabSilverGrams)
+                        _buildWarningNote(
+                            "Silver amount is less than 595g. Not eligible for Zakat."),
                       const SizedBox(height: 10),
                       ZakatInputField(
                         label: "Monthly Salary (RM)",
                         controller: salaryController,
-                        tooltip: "Minimum RM 2400 per month required.",
+                        tooltip: "Minimum RM 3200 per month required.",
                         icon: Icons.account_balance_wallet,
                       ),
                       if (double.tryParse(salaryController.text) != null &&
-                          double.tryParse(salaryController.text)! < minMonthlySalary)
-                        _buildWarningNote("Monthly salary is less than RM 2400. Not eligible for Zakat."),
+                          double.tryParse(salaryController.text)! <
+                              minMonthlySalary)
+                        _buildWarningNote(
+                            "Monthly salary is less than RM 3200. Not eligible for Zakat."),
                       const SizedBox(height: 10),
                       ZakatInputField(
                         label: "Cash & Bank",
@@ -236,6 +378,33 @@ class _ZakatCalculatorPageState extends State<ZakatCalculatorPage> {
                         icon: Icons.receipt_long,
                       ),
                       const SizedBox(height: 20),
+                      // Check Nisab Button
+                      ElevatedButton.icon(
+                        onPressed: checkNisab,
+                        icon: const Icon(Icons.help_outline),
+                        label: const Text("Check Eligibility (Nisab Calculation)"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.amber.shade600,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          minimumSize: Size(double.infinity, 50),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "Check if you meet the minimum threshold (Nisab) to pay Zakat",
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      // Calculate and Reset Buttons
                       Row(
                         children: [
                           Expanded(
@@ -246,7 +415,8 @@ class _ZakatCalculatorPageState extends State<ZakatCalculatorPage> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.green.shade700,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
@@ -292,9 +462,12 @@ class _ZakatCalculatorPageState extends State<ZakatCalculatorPage> {
                               icon: const Icon(Icons.payment),
                               label: const Text("Pay Zakat"),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: isEligible ? Colors.green.shade700 : Colors.grey,
+                                backgroundColor: isEligible
+                                    ? Colors.green.shade700
+                                    : Colors.grey,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
@@ -325,100 +498,15 @@ class _ZakatCalculatorPageState extends State<ZakatCalculatorPage> {
   }
 
   Widget _buildResultCard() {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isEligible ? Colors.green.shade200 : Colors.orange.shade200,
-          width: 1,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildResultRow("Gold Value", goldValue),
-            _buildResultRow("Silver Value", silverValue),
-            _buildResultRow("Annual Salary", salaryValue),
-            const Divider(),
-            _buildResultRow("Total Assets", totalAssets, bold: true),
-            _buildResultRow("Total Liabilities", totalLiabilities, bold: true),
-            _buildResultRow("Net Worth", netWorth, bold: true),
-            const Divider(),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isEligible ? Colors.green.shade50 : Colors.orange.shade50,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    isEligible ? Icons.check_circle : Icons.warning,
-                    color: isEligible ? Colors.green : Colors.orange,
-                    size: 48,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    isEligible ? "You are eligible to pay Zakat" : "You are not eligible to pay Zakat",
-                    style: TextStyle(
-                      color: isEligible ? Colors.green.shade700 : Colors.orange.shade700,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  if (isEligible) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      "Zakat Amount (2.5%)",
-                      style: TextStyle(
-                        color: Colors.green.shade700,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      "RM ${zakatAmount.toStringAsFixed(2)}",
-                      style: TextStyle(
-                        color: Colors.green.shade700,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 24,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildResultRow(String label, double value, {bool bold = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-          Text(
-            "RM ${value.toStringAsFixed(2)}",
-            style: TextStyle(
-              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-              color: bold ? Colors.green.shade700 : null,
-            ),
-          ),
-        ],
-      ),
+    return ZakatResultCard(
+      goldValue: goldValue,
+      silverValue: silverValue,
+      salaryValue: salaryValue,
+      totalAssets: totalAssets,
+      totalLiabilities: totalLiabilities,
+      netWorth: netWorth,
+      zakatAmount: zakatAmount,
+      isEligible: isEligible,
     );
   }
 }

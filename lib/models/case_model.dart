@@ -7,6 +7,7 @@ class Case {
   final String submittedBy;
   final String userEmail;
   final String? proofUrl;
+  final Map<String, dynamic>? pdfData; // Store the entire PDF data
   final String status;
   final DateTime? submittedAt;
   final DateTime? approvedAt;
@@ -22,6 +23,7 @@ class Case {
     required this.submittedBy,
     required this.userEmail,
     this.proofUrl,
+    this.pdfData,
     this.status = 'pending',
     this.submittedAt,
     this.approvedAt,
@@ -38,6 +40,7 @@ class Case {
       'submittedBy': submittedBy,
       'userEmail': userEmail,
       'proofUrl': proofUrl,
+      'pdfData': pdfData,
       'status': status,
       'submittedAt': submittedAt,
       'approvedAt': approvedAt,
@@ -56,6 +59,7 @@ class Case {
       submittedBy: map['submittedBy'] ?? '',
       userEmail: map['userEmail'] ?? '',
       proofUrl: map['proofUrl'],
+      pdfData: map['pdfData'],
       status: map['status'] ?? 'pending',
       submittedAt: map['submittedAt']?.toDate(),
       approvedAt: map['approvedAt']?.toDate(),

@@ -57,6 +57,9 @@ dependencies:
   flutter_stripe: ^9.5.0
   http: ^1.4.0
   image_picker: ^1.1.2
+  path_provider: ^2.1.5
+  share_plus: 11.0.0
+  syncfusion_flutter_pdfviewer: ^30.1.38
 
 dev_dependencies:
   flutter_test:

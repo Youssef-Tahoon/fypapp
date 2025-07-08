@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 import '../../providers/admin_provider.dart';
 import '../../colors/colors.dart';
+import '../../widgets/pdf_preview_widget.dart';
+import '../../models/case_model.dart';
 
-class CaseApprovalPage extends StatelessWidget {
+class CaseApprovalPage extends StatefulWidget {
+  @override
+  State<CaseApprovalPage> createState() => _CaseApprovalPageState();
+}
+
+class _CaseApprovalPageState extends State<CaseApprovalPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   Future<void> _updateCaseStatus(String caseId, String status) async {
@@ -20,12 +27,94 @@ class CaseApprovalPage extends StatelessWidget {
     }
   }
 
-  Future<void> _viewPdf(String url) async {
-    if (await canLaunch(url)) {
-      await launch(url);
-    } else {
-      throw 'Could not launch $url';
+  // Handles viewing PDF regardless of storage format (new Base64 or legacy URL)
+  void _viewPdf(BuildContext context, Map<String, dynamic> caseData) async {
+    // Check if we have the new PDF data format
+    if (caseData['pdfData'] != null) {
+      _showPdfPreviewDialog(context, caseData['pdfData']);
+      return;
     }
+    
+    // Legacy URL-based PDF handling
+    final proofUrl = caseData['proofUrl'];
+    if (proofUrl != null && proofUrl is String) {
+      try {
+        if (await canLaunchUrlString(proofUrl)) {
+          await launchUrlString(proofUrl);
+        } else {
+          throw 'Could not launch $proofUrl';
+        }
+      } catch (e) {
+        print('Error launching URL: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error viewing PDF: $e')),
+        );
+      }
+      return;
+    }
+    
+    // No PDF found
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('No PDF document available')),
+    );
+  }
+  
+  // Show PDF preview dialog
+  void _showPdfPreviewDialog(BuildContext context, Map<String, dynamic> pdfData) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Container(
+            padding: EdgeInsets.all(16),
+            constraints: BoxConstraints(maxWidth: 600, maxHeight: 600),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'PDF Document: ${pdfData['pdfName']}',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 16),
+                Expanded(
+                  child: PdfPreviewWidget(
+                    pdfData: pdfData,
+                    isAdmin: true,
+                  ),
+                ),
+                SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text('Close'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -85,8 +174,12 @@ class CaseApprovalPage extends StatelessWidget {
             padding: EdgeInsets.all(16),
             itemBuilder: (context, index) {
               final caseDoc = cases[index];
-              final caseData = caseDoc.data() as Map<String, dynamic>;
 
+              // Convert to Case model for cleaner code
+              final Map<String, dynamic> rawData = caseDoc.data() as Map<String, dynamic>;
+              rawData['id'] = caseDoc.id; // Ensure ID is included
+              final caseItem = Case.fromMap(rawData);
+              
               return Card(
                 margin: EdgeInsets.only(bottom: 16),
                 elevation: 4,
@@ -99,7 +192,7 @@ class CaseApprovalPage extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Case ID: ${caseDoc.id}',
+                        'Case ID: ${caseItem.id}',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Colors.grey[600],
@@ -107,12 +200,12 @@ class CaseApprovalPage extends StatelessWidget {
                       ),
                       SizedBox(height: 8),
                       Text(
-                        caseData['title']?.toString() ?? 'Untitled Case',
+                        caseItem.title ?? 'Untitled Case',
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       SizedBox(height: 8),
                       Text(
-                        caseData['description']?.toString() ?? 'No description provided',
+                        caseItem.description,
                         style: TextStyle(fontSize: 16),
                       ),
                       SizedBox(height: 16),
@@ -121,7 +214,7 @@ class CaseApprovalPage extends StatelessWidget {
                           Icon(Icons.attach_money, color: AppColor.kPrimary),
                           SizedBox(width: 8),
                           Text(
-                            'Amount Needed: RM ${caseData['amountNeeded']?.toString() ?? '0'}',
+                            'Amount Needed: RM ${caseItem.amountNeeded}',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -129,23 +222,27 @@ class CaseApprovalPage extends StatelessWidget {
                           ),
                         ],
                       ),
-                      if (caseData['userEmail'] != null) ...[
-                        SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Icon(Icons.email, color: Colors.blue),
-                            SizedBox(width: 8),
-                            Text(
-                              'Submitted by: ${caseData['userEmail']}',
-                              style: TextStyle(color: Colors.grey[700]),
-                            ),
-                          ],
-                        ),
-                      ],
-                      if (caseData['proofUrl'] != null) ...[
+                      SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.email, color: Colors.blue),
+                          SizedBox(width: 8),
+                          Text(
+                            'Submitted by: ${caseItem.userEmail}',
+                            style: TextStyle(color: Colors.grey[700]),
+                          ),
+                        ],
+                      ),
+                      if (caseItem.proofUrl != null || caseItem.pdfData != null) ...[
                         SizedBox(height: 16),
                         ElevatedButton.icon(
-                          onPressed: () => _viewPdf(caseData['proofUrl']),
+                          onPressed: () {
+                            if (caseItem.pdfData != null) {
+                              _showPdfPreviewDialog(context, caseItem.pdfData!);
+                            } else if (caseItem.proofUrl != null) {
+                              _viewPdf(context, rawData);
+                            }
+                          },
                           icon: Icon(Icons.description),
                           label: Text('View Proof Document'),
                           style: ElevatedButton.styleFrom(
